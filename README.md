@@ -17,7 +17,7 @@ Outputs:
 
 ## GitHub Pages usage
 
-Open `docs-site/index.html` (or published Pages site), then:
+Build and publish from `docs-site/dist`, then open the published Pages site (or local `docs-site/dist/index.html`), then:
 - Run benchmark
 - Copy generated env
 - Download mirror-report.json
@@ -52,6 +52,21 @@ Mirror item format:
 
 Required fields: `name`, `url`, `kind`.
 
+
+## Building GitHub Pages frontend
+
+```bash
+cd docs-site
+npm install
+npm run build
+```
+
+Notes:
+- No CDN assets are used at runtime (no Tailwind CDN, no remote JS/CSS/fonts).
+- Build output is deterministic static files in `docs-site/dist`.
+- GitHub Pages workflow deploys `docs-site/dist` only.
+- Frontend remains fully static and offline-friendly after first load.
+
 ## Dockerfile optimizer
 
 - no `ENV` before `FROM`
@@ -68,7 +83,7 @@ Shell optimizer:
 
 ## GitHub Pages UI
 
-- The docs site is a static Tailwind CDN page in `docs-site/` (no build step required).
+- The docs site is a static Tailwind build in `docs-site/` with local compiled CSS (no CDN runtime dependencies).
 - Browser benchmark results are approximate because CORS can affect reachability/latency checks.
 - CLI benchmark output remains authoritative for automation and CI.
 - No backend is used.

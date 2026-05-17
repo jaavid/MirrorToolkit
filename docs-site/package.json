@@ -1,0 +1,16 @@
+{
+  "name": "mirrortoolkit-docs-site",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "clean": "node build.mjs --clean",
+    "build:css": "tailwindcss -i ./src/input.css -o ./dist/assets/tailwind.css --minify",
+    "build": "node build.mjs",
+    "watch": "tailwindcss -i ./src/input.css -o ./dist/assets/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13"
+  }
+}
