@@ -44,3 +44,13 @@ docker build \
   --build-arg MAVEN_MIRROR_URL="$MAVEN_MIRROR_URL" \
   -f examples/Dockerfile.python-node .
 ```
+
+
+## Linting
+```bash
+shellcheck setup-mirrors.sh scripts/*.sh
+```
+
+Notes:
+- `setup-mirrors.sh` intentionally sources the path provided by `--output` at runtime when `--apply` is enabled.
+- `scripts/optimize-dockerfile.sh` optionally sources `.env.mirrors` when present.
