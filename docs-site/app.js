@@ -1,5 +1,5 @@
 const CATEGORY_ORDER = ["all", "docker", "pypi", "npm", "maven", "ubuntu", "debian", "alpine", "golang", "composer", "nuget"];
-const MIRROR_SOURCES = ["./mirrors.json", "../mirrors.json", "/mirrors.json"];
+const MIRROR_SOURCES = ["./mirrors.json"];
 
 const state = {
   mirrorsData: null,
@@ -48,7 +48,7 @@ async function loadMirrors() {
       console.warn(`Could not load ${path}`, error);
     }
   }
-  setStatusMessage("mirrors.json not loaded. Upload mirrors.json to continue.", "text-amber-200");
+  setStatusMessage("Could not load local mirrors.json (./mirrors.json). You can still upload mirrors.json manually to continue.", "text-amber-200");
   return false;
 }
 
@@ -141,7 +141,7 @@ function optimizeDocker(){ const out=state.dockerInput.split("\n").map(l=>l).joi
 async function benchmark() {
   if (state.benchmarkState === "running") return;
   if (!state.mirrorsData?.mirrors) {
-    setStatusMessage("mirrors.json not loaded. Upload mirrors.json to continue.", "text-amber-200");
+    setStatusMessage("Could not load local mirrors.json (./mirrors.json). You can still upload mirrors.json manually to continue.", "text-amber-200");
     return;
   }
   const mirrors = Object.entries(state.mirrorsData.mirrors).flatMap(([category,list]) => list.map(m => ({category, ...m})));
