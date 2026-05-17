@@ -162,7 +162,7 @@ function renderLatencyTable() {
     const min = reachable.length ? Math.min(...reachable.map(r => r.latency_ms)) : 0;
     const max = reachable.length ? Math.max(...reachable.map(r => r.latency_ms)) : 1;
 
-    html += `<h3 class="mt-5 text-lg font-medium capitalize">${cat}</h3><div class="mt-2 space-y-2">`;
+    html += `<h3 class="mt-5 text-lg font-medium capitalize">${cat}</h3><p class="text-xs text-slate-400">Reachable: ${reachable.length} | Failed: ${catResults.length - reachable.length} ${reachable.length ? `| Fastest: ${reachable.sort((a,b)=>a.latency_ms-b.latency_ms)[0].name}` : ""}</p><div class="mt-2 space-y-2">`;
     for (const r of catResults) {
       const fastest = r.reachable && r.latency_ms === min;
       const width = r.reachable ? (max === min ? 100 : Math.max(15, Math.round(((max - r.latency_ms) / (max - min)) * 100))) : 10;
@@ -170,7 +170,7 @@ function renderLatencyTable() {
       html += `<article class="rounded-xl border ${fastest ? "border-emerald-400/50" : "border-white/10"} bg-slate-900/70 p-3">
         <div class="flex flex-wrap items-center justify-between gap-2"><p class="font-medium">${r.name}</p><div class="flex gap-2 text-xs"><span class="rounded-full bg-white/10 px-2 py-1">${r.region}</span><span class="rounded-full bg-white/10 px-2 py-1">${r.kind}</span>${fastest ? '<span class="rounded-full bg-cyan-400 px-2 py-1 text-slate-950">fastest</span>' : ''}</div></div>
         <p class="mt-1 break-all text-sm text-slate-300">${r.url}</p>
-        <div class="mt-2 grid gap-2 text-sm md:grid-cols-[180px_1fr]"><span class="inline-flex w-fit items-center rounded-full px-2 py-1 ${statusClass}">status: ${r.status}</span><div class="flex items-center gap-2"><span class="w-16">${r.reachable ? `${r.latency_ms} ms` : "failed"}</span><div class="h-2 flex-1 rounded-full bg-white/10"><div class="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" style="width:${width}%"></div></div></div></div>
+        <div class="mt-2 grid gap-2 text-sm md:grid-cols-[220px_1fr]"><span class="inline-flex w-fit items-center rounded-full px-2 py-1 ${statusClass}">status: ${r.status}</span><div class="flex items-center gap-2"><span class="w-16">${r.reachable ? `${r.latency_ms} ms` : "failed"}</span><div class="h-2 flex-1 rounded-full bg-white/10"><div class="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" style="width:${width}%"></div></div></div></div>
       </article>`;
     }
     html += `</div>`;
@@ -182,10 +182,8 @@ function renderLatencyTable() {
 function envFromReport() {
   if (!reportData?.results) return "# Run benchmark to generate environment variables.";
   const pick = cat => reportData.results.filter(r => r.category === cat && r.reachable).sort((a, b) => a.latency_ms - b.latency_ms)[0];
-  const docker = pick("docker") || {};
-  const pypi = pick("pypi") || {};
-  const npm = pick("npm") || {};
-  return `DOCKER_REGISTRY_MIRROR=${docker.url || ""}\nPIP_INDEX_URL=${pypi.url || ""}\nNPM_CONFIG_REGISTRY=${npm.url || ""}`;
+  const map = {docker:"DOCKER_REGISTRY_MIRROR",pypi:"PIP_INDEX_URL",npm:"NPM_CONFIG_REGISTRY",maven:"MAVEN_MIRROR_URL",ubuntu:"APT_UBUNTU_MIRROR",debian:"APT_DEBIAN_MIRROR",alpine:"ALPINE_MIRROR",golang:"GOPROXY",composer:"COMPOSER_REPO",nuget:"NUGET_SOURCE"};
+  return Object.entries(map).map(([cat,key]) => `${key}=${(pick(cat)||{}).url || ""}`).join("\n");
 }
 
 function renderEnvOutput() {
@@ -196,31 +194,36 @@ function renderDockerfileOptimizer() {
   const el = document.getElementById("dockerfileSection");
   el.innerHTML = `<div class="rounded-2xl border border-white/10 bg-white/5 p-4 shadow">
     <h2 class="text-xl font-semibold">Dockerfile optimizer</h2>
-    <p class="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">Marker help: <code># mirror-toolkit: enable-apt-rewrite</code> and <code># mirror-toolkit: enable-maven-mirror</code>.</p>
+    <p class="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">Browser optimizer is preview-only and may differ from CLI. Use CLI as authoritative output.</p>
+    <div class="mt-3"><label class="text-sm text-slate-300">Profile</label><select id="dockerProfile" class="ml-2 rounded border border-white/10 bg-slate-900 px-2 py-1"><option>conservative</option><option>production</option><option>restricted-network</option><option>ci</option></select></div>
     <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
       <div><label for="dockerfileInput" class="mb-2 block text-sm text-slate-300">Dockerfile input</label><textarea id="dockerfileInput" rows="14" placeholder="Paste Dockerfile" class="w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2"></textarea></div>
       <div><label for="dockerfileOutput" class="mb-2 block text-sm text-slate-300">Optimized output</label><textarea id="dockerfileOutput" rows="14" readonly placeholder="Optimized Dockerfile output appears here." class="w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-slate-200"></textarea></div>
     </div>
     <div class="mt-3 flex flex-wrap gap-2">
       <button id="optimizeDockerfile" class="rounded-xl bg-cyan-400 px-4 py-2 font-medium text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Optimize Dockerfile</button>
-      <a id="downloadOptimized" class="hidden rounded-xl bg-white/10 px-4 py-2 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Download optimized Dockerfile</a>
+      <a id="downloadOptimized" class="hidden rounded-xl bg-white/10 px-4 py-2 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Download optimized Dockerfile</a><a id="downloadDockerReport" class="hidden rounded-xl bg-white/10 px-4 py-2 hover:bg-white/15">Download report JSON</a>
       <button id="clearDockerfile" class="rounded-xl bg-white/10 px-4 py-2 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">Clear</button>
     </div>
   </div>`;
 
   document.getElementById("optimizeDockerfile").onclick = () => {
+    const profile=document.getElementById("dockerProfile").value;
     const out = optimizeDockerfile(document.getElementById("dockerfileInput").value || "");
+    const report={profile,detected:{},changes:["preview-only browser transformation"],warnings:["CLI optimizer is authoritative"],skipped:[]};
     document.getElementById("dockerfileOutput").value = out || "Optimized Dockerfile output appears here.";
     const a = document.getElementById("downloadOptimized");
     a.href = URL.createObjectURL(new Blob([out], { type: "text/plain" }));
     a.download = "Dockerfile.optimized";
     a.classList.remove("hidden");
+    const ar=document.getElementById("downloadDockerReport"); ar.href=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"})); ar.download="dockerfile-report.json"; ar.classList.remove("hidden");
   };
 
   document.getElementById("clearDockerfile").onclick = () => {
     document.getElementById("dockerfileInput").value = "";
     document.getElementById("dockerfileOutput").value = "";
     document.getElementById("downloadOptimized").classList.add("hidden");
+    document.getElementById("downloadDockerReport").classList.add("hidden");
   };
 }
 

@@ -1,132 +1,134 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-[[ $# -eq 2 ]] || { echo "Usage: $0 input.Dockerfile output.Dockerfile" >&2; exit 1; }
+profile="conservative"
+report_file=""
+env_file=".env.mirrors"
+
+usage(){
+  cat >&2 <<USAGE
+Usage: $0 [--profile conservative|production|restricted-network|ci] [--report output.json] [--env-file .env.mirrors] input.Dockerfile output.Dockerfile
+USAGE
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile) profile="${2:-}"; shift 2 ;;
+    --report) report_file="${2:-}"; shift 2 ;;
+    --env-file) env_file="${2:-}"; shift 2 ;;
+    -h|--help) usage ;;
+    --*) echo "Unknown option: $1" >&2; usage ;;
+    *) break ;;
+  esac
+done
+
+[[ $# -eq 2 ]] || usage
+[[ "$profile" =~ ^(conservative|production|restricted-network|ci)$ ]] || { echo "Invalid profile: $profile" >&2; exit 1; }
 in="$1"; out="$2"
 [[ -f "$in" ]] || { echo "Input not found: $in" >&2; exit 1; }
 
-if [[ -f .env.mirrors ]]; then
-  # shellcheck disable=SC1091
-  set -a; source .env.mirrors; set +a
-fi
+python3 - "$in" "$out" "$profile" "$report_file" "$env_file" <<'PY'
+import json,re,sys
+from pathlib import Path
+inp, outp, profile, report_file, env_file = sys.argv[1:6]
+text = Path(inp).read_text()
+lines = text.splitlines()
 
-is_python_related() {
-  local f="$1"
-  grep -Eqi '^[[:space:]]*FROM[[:space:]].*python' "$f" || grep -Eqi '(^|[[:space:]])pip([[:space:]]|$)|requirements\.txt|pyproject\.toml' "$f"
-}
+def parse_env_file(path):
+    vals={}
+    p=Path(path)
+    if not p.exists(): return vals
+    for ln in p.read_text().splitlines():
+        if not ln or ln.startswith('#') or '=' not in ln: continue
+        k,v=ln.split('=',1); vals[k.strip()]=v.strip().strip('"').strip("'")
+    return vals
 
-is_node_related() {
-  local f="$1"
-  grep -Eqi '^[[:space:]]*FROM[[:space:]].*node' "$f" || grep -Eqi '(^|[[:space:]])(npm|pnpm|yarn)([[:space:]]|$)|package\.json' "$f"
-}
+envvals=parse_env_file(env_file)
+report={"profile":profile,"detected":{"languages":[],"package_managers":[],"base_images":[],"stages":[]},"changes":[],"warnings":[],"skipped":[]}
 
-is_java_related() {
-  local f="$1"
-  grep -Eqi '^[[:space:]]*FROM[[:space:]].*(maven|gradle|openjdk|eclipse-temurin|amazoncorretto|zulu)' "$f" || grep -Eqi '(^|[[:space:]])(mvn|gradle)([[:space:]]|$)|pom\.xml|build\.gradle' "$f"
-}
+stages=[]; cur=None
+for i,l in enumerate(lines):
+    m=re.match(r'^\s*FROM\s+([^\s]+)',l,re.I)
+    if m:
+        if cur: stages.append(cur)
+        cur={"from":m.group(1),"start":i,"end":len(lines)-1}
+    if cur: cur["end"]=i
+if cur: stages.append(cur)
 
-python_related=false
-node_related=false
-java_related=false
-if is_python_related "$in"; then python_related=true; fi
-if is_node_related "$in"; then node_related=true; fi
-if is_java_related "$in"; then java_related=true; fi
+full='\n'.join(lines).lower()
+if 'node' in full or 'npm ' in full or 'package.json' in full: report['detected']['languages'].append('node')
+if 'python' in full or 'pip ' in full or 'requirements.txt' in full: report['detected']['languages'].append('python')
+if any(x in full for x in ['maven','openjdk','temurin','mvn '] ): report['detected']['languages'].append('java')
+for pm,kws in [('npm',['npm ci','npm install','package-lock.json']),('pnpm',['pnpm ','pnpm-lock.yaml']),('yarn',['yarn ','yarn.lock']),('pip',['pip install','requirements.txt']),('poetry',['poetry install','poetry.lock']),('uv',['uv pip','uv.lock']),('maven',['mvn ','pom.xml']),('gradle',['gradle','build.gradle'])]:
+    if any(k in full for k in kws): report['detected']['package_managers'].append(pm)
 
-awk -v py="$python_related" -v nd="$node_related" '
-BEGIN {
-  split("PIP_INDEX_URL NPM_CONFIG_REGISTRY MAVEN_MIRROR_URL APT_UBUNTU_MIRROR APT_UBUNTU_SECURITY_MIRROR APT_DEBIAN_MIRROR APT_DEBIAN_SECURITY_MIRROR", args, " ")
-  in_stage=0
-}
-function trim(s){sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/, "", s); return s}
-function stage_flush(    i) {
-  if (!in_stage) return
-  for (i=1;i<=7;i++) print "ARG " args[i]
-  if (py=="true") print "ENV PIP_INDEX_URL=${PIP_INDEX_URL}"
-  if (nd=="true") print "ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}"
-  for (i=1;i<=stage_count;i++) print stage[i]
-  delete has_arg; delete stage
-  stage_count=0
-}
-{
-  line=$0
-  if (line ~ /^[[:space:]]*FROM[[:space:]]/) {
-    stage_flush()
-    print line
-    in_stage=1
-    next
-  }
-  if (!in_stage) {
-    print line
-    next
-  }
+report['detected']['base_images']=[s['from'] for s in stages]
 
-  t=trim(line)
-  if (t ~ /^ARG[[:space:]]+/) {
-    split(t, a, /[[:space:]=]+/)
-    n=a[2]
-    has_arg[n]=1
-  }
+out=[]
+inserted_global=False
+if stages and profile!='conservative':
+    if any('node' in s['from'].lower() for s in stages): out.append('ARG NODE_IMAGE=node:20-alpine')
+    if any('python' in s['from'].lower() for s in stages): out.append('ARG PYTHON_IMAGE=python:3.12-slim')
+    if any(any(x in s['from'].lower() for x in ['maven','openjdk','temurin']) for s in stages): out.append('ARG JAVA_IMAGE=eclipse-temurin:21-jre')
+    if out: inserted_global=True; report['changes'].append('Inserted global base-image ARG defaults for non-conservative profile.')
 
-  if (t ~ /^ARG[[:space:]]+PIP_INDEX_URL([[:space:]]*=.*)?$/) next
-  if (t ~ /^ARG[[:space:]]+NPM_CONFIG_REGISTRY([[:space:]]*=.*)?$/) next
-  if (t ~ /^ARG[[:space:]]+MAVEN_MIRROR_URL([[:space:]]*=.*)?$/) next
-  if (t ~ /^ARG[[:space:]]+APT_UBUNTU_MIRROR([[:space:]]*=.*)?$/) next
-  if (t ~ /^ARG[[:space:]]+APT_UBUNTU_SECURITY_MIRROR([[:space:]]*=.*)?$/) next
-  if (t ~ /^ARG[[:space:]]+APT_DEBIAN_MIRROR([[:space:]]*=.*)?$/) next
-  if (t ~ /^ARG[[:space:]]+APT_DEBIAN_SECURITY_MIRROR([[:space:]]*=.*)?$/) next
-  if (t == "ENV PIP_INDEX_URL=${PIP_INDEX_URL}") next
-  if (t == "ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}") next
+stage_idx=-1
+seen_by_stage=[]
+for idx,l in enumerate(lines):
+    fm=re.match(r'^(\s*FROM\s+)',l,re.I)
+    if fm:
+        stage_idx+=1
+        out.append(l)
+        frag=[]
+        stext='\n'.join(lines[stages[stage_idx]['start']:stages[stage_idx]['end']+1]).lower() if stage_idx < len(stages) else ''
+        is_node=any(x in stext for x in [' node', 'npm ', 'pnpm ', 'yarn ', 'package.json']) or 'node' in l.lower()
+        is_py=any(x in stext for x in [' python', 'pip ', 'requirements.txt', 'pyproject.toml']) or 'python' in l.lower()
+        is_java=any(x in stext for x in ['mvn ','maven','pom.xml']) or any(x in l.lower() for x in ['maven','openjdk','temurin'])
+        if is_node: frag += ['ARG NPM_CONFIG_REGISTRY','ARG PNPM_REGISTRY','ARG YARN_NPM_REGISTRY_SERVER']
+        if is_py: frag += ['ARG PIP_INDEX_URL','ARG PIP_EXTRA_INDEX_URL']
+        if is_java: frag += ['ARG MAVEN_MIRROR_URL']
+        if '# mirror-toolkit: enable-apt-rewrite' in text and any(x in l.lower() for x in ['debian','ubuntu']):
+            frag += ['ARG APT_UBUNTU_MIRROR','ARG APT_UBUNTU_SECURITY_MIRROR','ARG APT_DEBIAN_MIRROR','ARG APT_DEBIAN_SECURITY_MIRROR']
+        for a in frag:
+            out.append(a)
+        if frag: report['changes'].append(f"Injected stage ARGs for stage {stage_idx+1}: {', '.join(frag)}")
+        seen_by_stage.append(set(x.split()[1] for x in frag))
+        continue
 
-  stage[++stage_count]=line
-}
-END { stage_flush() }
-' "$in" > "$out"
+    nl=l
+    if profile in ('production','restricted-network','ci'):
+        m=re.match(r'^\s*ENV\s+NPM_CONFIG_REGISTRY=(https?://\S+)',l)
+        if m:
+            val=m.group(1)
+            out.append(f'ARG NPM_CONFIG_REGISTRY={val}')
+            out.append('ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}')
+            report['changes'].append('Normalized hardcoded NPM_CONFIG_REGISTRY ENV to ARG-based form.')
+            continue
+        m2=re.search(r'npm\s+config\s+set\s+registry\s+(https?://\S+)',l)
+        if m2:
+            nl=re.sub(r'npm\s+config\s+set\s+registry\s+https?://\S+','npm config set registry "${NPM_CONFIG_REGISTRY}"',l)
+            report['changes'].append('Rewrote hardcoded npm config registry command to build-arg variable.')
+        if 'pip install' in l and '--index-url ' in l and re.search(r'--index-url\s+https?://\S+',l):
+            nl=re.sub(r'--index-url\s+https?://\S+','--index-url "${PIP_INDEX_URL}"',nl)
+            report['changes'].append('Rewrote hardcoded pip --index-url to ${PIP_INDEX_URL}.')
+    out.append(nl)
 
-if [[ "$java_related" == "true" ]] && ! grep -q 'mirror-toolkit: maven-mirror-snippet' "$out"; then
-cat >> "$out" <<'EOF_MVN'
+# dedupe exact repeated injected ARG/ENV lines while preserving others
+final=[]; seen=set()
+managed={"NODE_IMAGE","PYTHON_IMAGE","JAVA_IMAGE","NPM_CONFIG_REGISTRY","PNPM_REGISTRY","YARN_NPM_REGISTRY_SERVER","PIP_INDEX_URL","PIP_EXTRA_INDEX_URL","MAVEN_MIRROR_URL","APT_UBUNTU_MIRROR","APT_UBUNTU_SECURITY_MIRROR","APT_DEBIAN_MIRROR","APT_DEBIAN_SECURITY_MIRROR"}
+for l in out:
+    key=l.strip()
+    m=re.match(r'^ARG\s+([A-Z0-9_]+)(=.*)?$',key)
+    managed_line = (m and m.group(1) in managed) or key in ('ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}','ENV PIP_INDEX_URL=${PIP_INDEX_URL}')
+    if managed_line:
+        if key in seen: continue
+        seen.add(key)
+    final.append(l)
 
-# mirror-toolkit: maven-mirror-snippet
-# Optional Maven mirror snippet:
-# RUN mkdir -p /root/.m2 && cat > /root/.m2/settings.xml <<'XML'
-# <settings><mirrors><mirror><id>mirror</id><url>${MAVEN_MIRROR_URL}</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>
-# XML
-EOF_MVN
-fi
-
-if [[ "$java_related" == "true" ]] && grep -q '# mirror-toolkit: enable-maven-mirror' "$out" && ! grep -q 'mirror-toolkit maven active block' "$out"; then
-cat >> "$out" <<'EOF_MVNA'
-
-# mirror-toolkit maven active block
-RUN set -eu; \
-    mkdir -p /root/.m2; \
-    cat > /root/.m2/settings.xml <<'XML'
-<settings><mirrors><mirror><id>mirror-toolkit</id><url>${MAVEN_MIRROR_URL}</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>
-XML
-EOF_MVNA
-fi
-
-if grep -q '# mirror-toolkit: enable-apt-rewrite' "$out" && ! grep -q 'mirror-toolkit apt rewrite block' "$out"; then
-cat >> "$out" <<'EOF_APT'
-
-# mirror-toolkit apt rewrite block
-# This only changes apt sources inside the Docker image build; host APT is never modified.
-RUN set -eu; \
-    [ -f /etc/os-release ] && . /etc/os-release || true; \
-    [ -f /etc/apt/sources.list ] && cp /etc/apt/sources.list /etc/apt/sources.list.bak || true; \
-    [ -f /etc/apt/sources.list.d/debian.sources ] && cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.bak || true; \
-    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak || true; \
-    if [ "${ID:-}" = "debian" ] || [ "${ID_LIKE:-}" = "debian" ]; then \
-      if [ -n "${APT_DEBIAN_MIRROR:-}" ]; then \
-        [ -f /etc/apt/sources.list ] && sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g; s|http://security.debian.org/debian-security|${APT_DEBIAN_SECURITY_MIRROR:-$APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list || true; \
-        [ -f /etc/apt/sources.list.d/debian.sources ] && sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g; s|http://security.debian.org/debian-security|${APT_DEBIAN_SECURITY_MIRROR:-$APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources || true; \
-      fi; \
-    elif [ "${ID:-}" = "ubuntu" ] || [ "${ID_LIKE:-}" = "ubuntu" ] || [ "${ID_LIKE:-}" = "debian ubuntu" ]; then \
-      if [ -n "${APT_UBUNTU_MIRROR:-}" ]; then \
-        [ -f /etc/apt/sources.list ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_UBUNTU_MIRROR}|g; s|http://security.ubuntu.com/ubuntu|${APT_UBUNTU_SECURITY_MIRROR:-$APT_UBUNTU_MIRROR}|g" /etc/apt/sources.list || true; \
-        [ -f /etc/apt/sources.list.d/ubuntu.sources ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_UBUNTU_MIRROR}|g; s|http://security.ubuntu.com/ubuntu|${APT_UBUNTU_SECURITY_MIRROR:-$APT_UBUNTU_MIRROR}|g" /etc/apt/sources.list.d/ubuntu.sources || true; \
-      fi; \
-    fi
-EOF_APT
-fi
-
-echo "Optimized Dockerfile written to $out"
+Path(outp).write_text('\n'.join(final)+'\n')
+if report_file:
+    Path(report_file).write_text(json.dumps(report,indent=2)+"\n")
+print(f"Optimized Dockerfile written to {outp}")
+if report_file: print(f"Report written to {report_file}")
+PY
