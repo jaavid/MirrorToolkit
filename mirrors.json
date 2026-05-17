@@ -1,0 +1,21 @@
+{
+  "docker": [
+    {"name":"Docker Official","url":"https://registry-1.docker.io","kind":"registry"},
+    {"name":"Mirror GCR","url":"https://mirror.gcr.io","kind":"registry"}
+  ],
+  "python": [
+    {"name":"PyPI","url":"https://pypi.org/simple","kind":"index"}
+  ],
+  "node": [
+    {"name":"NPM","url":"https://registry.npmjs.org","kind":"registry"}
+  ],
+  "java": [
+    {"name":"Maven Central","url":"https://repo.maven.apache.org/maven2","kind":"maven"}
+  ],
+  "ubuntu": [
+    {"name":"Ubuntu Archive","url":"http://archive.ubuntu.com/ubuntu","security_url":"http://security.ubuntu.com/ubuntu","kind":"apt"}
+  ],
+  "debian": [
+    {"name":"Debian Main","url":"http://deb.debian.org/debian","security_url":"http://security.debian.org/debian-security","kind":"apt"}
+  ]
+}
