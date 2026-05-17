@@ -5,26 +5,77 @@ set -Eeuo pipefail
 in="$1"; out="$2"
 [[ -f "$in" ]] || { echo "Input not found: $in" >&2; exit 1; }
 
-tmp="$(mktemp)"
-cp "$in" "$tmp"
-
 if [[ -f .env.mirrors ]]; then
   set -a; source .env.mirrors; set +a
 fi
 
-insert_arg_if_missing() {
-  local arg="$1"
-  if ! rg -q "^ARG ${arg}(=|$)" "$tmp"; then
-    awk -v line="ARG ${arg}" 'BEGIN{done=0} /^FROM / && done==0 {print line; done=1} {print} END{if(done==0) print line}' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
-  fi
+is_python_related() {
+  local f="$1"
+  grep -Eqi '^[[:space:]]*FROM[[:space:]].*python' "$f" || grep -Eqi '(^|[[:space:]])pip([[:space:]]|$)|requirements\.txt|pyproject\.toml' "$f"
 }
-for a in PIP_INDEX_URL NPM_CONFIG_REGISTRY MAVEN_MIRROR_URL APT_UBUNTU_MIRROR APT_UBUNTU_SECURITY_MIRROR APT_DEBIAN_MIRROR APT_DEBIAN_SECURITY_MIRROR; do insert_arg_if_missing "$a"; done
 
-rg -qi 'python' "$tmp" && ! rg -q '^ENV PIP_INDEX_URL=' "$tmp" && awk 'BEGIN{d=0} /^ARG PIP_INDEX_URL/ && d==0 {print; print "ENV PIP_INDEX_URL=${PIP_INDEX_URL}"; d=1; next} {print}' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
-rg -qi 'node|npm|yarn|pnpm' "$tmp" && ! rg -q '^ENV NPM_CONFIG_REGISTRY=' "$tmp" && awk 'BEGIN{d=0} /^ARG NPM_CONFIG_REGISTRY/ && d==0 {print; print "ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}"; d=1; next} {print}' "$tmp" > "${tmp}.new" && mv "${tmp}.new" "$tmp"
+is_node_related() {
+  local f="$1"
+  grep -Eqi '^[[:space:]]*FROM[[:space:]].*node' "$f" || grep -Eqi '(^|[[:space:]])(npm|pnpm|yarn)([[:space:]]|$)|package\.json' "$f"
+}
 
-if rg -qi 'maven|gradle|openjdk|temurin' "$tmp" && ! rg -q 'mirror-toolkit: maven-mirror-snippet' "$tmp"; then
-cat >> "$tmp" <<'EOF_MVN'
+python_related=false
+node_related=false
+if is_python_related "$in"; then python_related=true; fi
+if is_node_related "$in"; then node_related=true; fi
+
+awk -v py="$python_related" -v nd="$node_related" '
+BEGIN {
+  split("PIP_INDEX_URL NPM_CONFIG_REGISTRY MAVEN_MIRROR_URL APT_UBUNTU_MIRROR APT_UBUNTU_SECURITY_MIRROR APT_DEBIAN_MIRROR APT_DEBIAN_SECURITY_MIRROR", args, " ")
+  in_stage=0
+}
+function trim(s){sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/, "", s); return s}
+function stage_flush(    i) {
+  if (!in_stage) return
+  for (i=1;i<=7;i++) print "ARG " args[i]
+  if (py=="true") print "ENV PIP_INDEX_URL=${PIP_INDEX_URL}"
+  if (nd=="true") print "ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}"
+  for (i=1;i<=stage_count;i++) print stage[i]
+  delete has_arg; delete stage
+  stage_count=0
+}
+{
+  line=$0
+  if (line ~ /^[[:space:]]*FROM[[:space:]]/) {
+    stage_flush()
+    print line
+    in_stage=1
+    next
+  }
+  if (!in_stage) {
+    print line
+    next
+  }
+
+  t=trim(line)
+  if (t ~ /^ARG[[:space:]]+/) {
+    split(t, a, /[[:space:]=]+/)
+    n=a[2]
+    has_arg[n]=1
+  }
+
+  if (t ~ /^ARG[[:space:]]+PIP_INDEX_URL([[:space:]]*=.*)?$/) next
+  if (t ~ /^ARG[[:space:]]+NPM_CONFIG_REGISTRY([[:space:]]*=.*)?$/) next
+  if (t ~ /^ARG[[:space:]]+MAVEN_MIRROR_URL([[:space:]]*=.*)?$/) next
+  if (t ~ /^ARG[[:space:]]+APT_UBUNTU_MIRROR([[:space:]]*=.*)?$/) next
+  if (t ~ /^ARG[[:space:]]+APT_UBUNTU_SECURITY_MIRROR([[:space:]]*=.*)?$/) next
+  if (t ~ /^ARG[[:space:]]+APT_DEBIAN_MIRROR([[:space:]]*=.*)?$/) next
+  if (t ~ /^ARG[[:space:]]+APT_DEBIAN_SECURITY_MIRROR([[:space:]]*=.*)?$/) next
+  if (t == "ENV PIP_INDEX_URL=${PIP_INDEX_URL}") next
+  if (t == "ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}") next
+
+  stage[++stage_count]=line
+}
+END { stage_flush() }
+' "$in" > "$out"
+
+if grep -Eqi 'maven|gradle|openjdk|temurin' "$out" && ! grep -q 'mirror-toolkit: maven-mirror-snippet' "$out"; then
+cat >> "$out" <<'EOF_MVN'
 
 # mirror-toolkit: maven-mirror-snippet
 # Optional Maven mirror snippet:
@@ -34,22 +85,40 @@ cat >> "$tmp" <<'EOF_MVN'
 EOF_MVN
 fi
 
-if rg -q '# mirror-toolkit: enable-apt-rewrite' "$tmp" && ! rg -q 'mirror-toolkit apt rewrite block' "$tmp"; then
-cat >> "$tmp" <<'EOF_APT'
+if grep -q '# mirror-toolkit: enable-maven-mirror' "$out" && ! grep -q 'mirror-toolkit maven active block' "$out"; then
+cat >> "$out" <<'EOF_MVNA'
+
+# mirror-toolkit maven active block
+RUN set -eu; \
+    mkdir -p /root/.m2; \
+    cat > /root/.m2/settings.xml <<'XML'
+<settings><mirrors><mirror><id>mirror-toolkit</id><url>${MAVEN_MIRROR_URL}</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>
+XML
+EOF_MVNA
+fi
+
+if grep -q '# mirror-toolkit: enable-apt-rewrite' "$out" && ! grep -q 'mirror-toolkit apt rewrite block' "$out"; then
+cat >> "$out" <<'EOF_APT'
 
 # mirror-toolkit apt rewrite block
-RUN set -eux; \
-    if [ -f /etc/os-release ]; then . /etc/os-release; fi; \
-    if [ -f /etc/apt/sources.list ]; then cp /etc/apt/sources.list /etc/apt/sources.list.bak; fi; \
-    for f in /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/ubuntu.sources; do [ -f "$f" ] && cp "$f" "$f.bak" || true; done; \
+# This only changes apt sources inside the Docker image build; host APT is never modified.
+RUN set -eu; \
+    [ -f /etc/os-release ] && . /etc/os-release || true; \
+    [ -f /etc/apt/sources.list ] && cp /etc/apt/sources.list /etc/apt/sources.list.bak || true; \
+    [ -f /etc/apt/sources.list.d/debian.sources ] && cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.bak || true; \
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak || true; \
     if [ "${ID:-}" = "debian" ] || [ "${ID_LIKE:-}" = "debian" ]; then \
-      [ -n "${APT_DEBIAN_MIRROR:-}" ] && sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g; s|http://security.debian.org/debian-security|${APT_DEBIAN_SECURITY_MIRROR:-$APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true; \
-    else \
-      [ -n "${APT_UBUNTU_MIRROR:-}" ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_UBUNTU_MIRROR}|g; s|http://security.ubuntu.com/ubuntu|${APT_UBUNTU_SECURITY_MIRROR:-$APT_UBUNTU_MIRROR}|g" /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true; \
+      if [ -n "${APT_DEBIAN_MIRROR:-}" ]; then \
+        [ -f /etc/apt/sources.list ] && sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g; s|http://security.debian.org/debian-security|${APT_DEBIAN_SECURITY_MIRROR:-$APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list || true; \
+        [ -f /etc/apt/sources.list.d/debian.sources ] && sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g; s|http://security.debian.org/debian-security|${APT_DEBIAN_SECURITY_MIRROR:-$APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources || true; \
+      fi; \
+    elif [ "${ID:-}" = "ubuntu" ] || [ "${ID_LIKE:-}" = "ubuntu" ] || [ "${ID_LIKE:-}" = "debian ubuntu" ]; then \
+      if [ -n "${APT_UBUNTU_MIRROR:-}" ]; then \
+        [ -f /etc/apt/sources.list ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_UBUNTU_MIRROR}|g; s|http://security.ubuntu.com/ubuntu|${APT_UBUNTU_SECURITY_MIRROR:-$APT_UBUNTU_MIRROR}|g" /etc/apt/sources.list || true; \
+        [ -f /etc/apt/sources.list.d/ubuntu.sources ] && sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_UBUNTU_MIRROR}|g; s|http://security.ubuntu.com/ubuntu|${APT_UBUNTU_SECURITY_MIRROR:-$APT_UBUNTU_MIRROR}|g" /etc/apt/sources.list.d/ubuntu.sources || true; \
+      fi; \
     fi
 EOF_APT
 fi
 
-cp "$tmp" "$out"
-rm -f "$tmp"
 echo "Optimized Dockerfile written to $out"

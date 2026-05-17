@@ -1,0 +1,3 @@
+FROM ubuntu:24.04
+# mirror-toolkit: enable-apt-rewrite
+RUN echo ok

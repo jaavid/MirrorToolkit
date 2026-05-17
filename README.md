@@ -29,3 +29,9 @@ This project does **not** rewrite host APT sources. Prefer generated env/build a
 
 ## GitHub Pages optimizer
 The `docs-site/` app includes a browser-only Dockerfile optimizer where users upload a Dockerfile and download an optimized version.
+
+## Dockerfile optimizer markers
+- `# mirror-toolkit: enable-apt-rewrite`
+- `# mirror-toolkit: enable-maven-mirror`
+
+The optimizer is conservative by default. APT rewrite is opt-in and Maven active mirror config is opt-in. Host APT is never modified; rewrite applies only inside Docker image build stages.
