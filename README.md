@@ -5,11 +5,35 @@ A production-ready CLI/toolkit for selecting reachable mirrors in unstable or re
 ## Quick start
 ```bash
 chmod +x setup-mirrors.sh
-./setup-mirrors.sh --config mirrors.json --output .env.mirrors --report mirror-report.json --timeout 6
+./setup-mirrors.sh --config mirrors.json --output .env.mirrors --report mirror-report.json --timeout 6 --no-apply
 ```
 
-## Example generated `.env.mirrors`
-See `examples/env.example`.
+## CLI help
+```bash
+./setup-mirrors.sh --help
+```
+
+## `--apply` behavior
+- Docker: only when root; writes `/etc/docker/daemon.json`, preserves existing JSON keys, and backs up to `/etc/docker/daemon.json.bak.TIMESTAMP`.
+- Docker restart is opt-in with `--restart-docker`.
+- pip: writes `~/.pip/pip.conf` (backup if exists).
+- npm: runs `npm config set registry ...` when npm exists; warns otherwise.
+- Maven: writes `~/.m2/settings.xml` (backup if exists).
+- Host APT is never rewritten.
+
+## Generated env keys
+- `DOCKER_REGISTRY_MIRROR`, `DOCKER_REGISTRY_MIRROR_NAME`
+- `PIP_INDEX_URL`, `PIP_INDEX_URL_NAME`, `PIP_EXTRA_INDEX_URL`
+- `NPM_CONFIG_REGISTRY`, `NPM_CONFIG_REGISTRY_NAME`, `YARN_NPM_REGISTRY_SERVER`, `PNPM_REGISTRY`
+- `MAVEN_MIRROR_URL`, `MAVEN_MIRROR_URL_NAME`
+- `APT_UBUNTU_MIRROR`, `APT_UBUNTU_MIRROR_NAME`, `APT_UBUNTU_SECURITY_MIRROR`
+- `APT_DEBIAN_MIRROR`, `APT_DEBIAN_MIRROR_NAME`, `APT_DEBIAN_SECURITY_MIRROR`
+
+## Dockerfile optimizer examples
+- Python/Node Dockerfiles get only relevant env lines.
+- Maven snippet appears only for Java-related Dockerfiles.
+- Active Maven block requires marker: `# mirror-toolkit: enable-maven-mirror`.
+- APT rewrite block requires marker: `# mirror-toolkit: enable-apt-rewrite`.
 
 ## Docker build usage
 ```bash
@@ -20,18 +44,3 @@ docker build \
   --build-arg MAVEN_MIRROR_URL="$MAVEN_MIRROR_URL" \
   -f examples/Dockerfile.python-node .
 ```
-
-## CI/CD usage
-Use `.github/workflows/ci.yml` as a baseline for validation, smoke test, and generated-file checks.
-
-## Safety warning
-This project does **not** rewrite host APT sources. Prefer generated env/build args over destructive host configuration changes.
-
-## GitHub Pages optimizer
-The `docs-site/` app includes a browser-only Dockerfile optimizer where users upload a Dockerfile and download an optimized version.
-
-## Dockerfile optimizer markers
-- `# mirror-toolkit: enable-apt-rewrite`
-- `# mirror-toolkit: enable-maven-mirror`
-
-The optimizer is conservative by default. APT rewrite is opt-in and Maven active mirror config is opt-in. Host APT is never modified; rewrite applies only inside Docker image build stages.

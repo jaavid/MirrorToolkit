@@ -19,10 +19,17 @@ is_node_related() {
   grep -Eqi '^[[:space:]]*FROM[[:space:]].*node' "$f" || grep -Eqi '(^|[[:space:]])(npm|pnpm|yarn)([[:space:]]|$)|package\.json' "$f"
 }
 
+is_java_related() {
+  local f="$1"
+  grep -Eqi '^[[:space:]]*FROM[[:space:]].*(maven|gradle|openjdk|eclipse-temurin|amazoncorretto|zulu)' "$f" || grep -Eqi '(^|[[:space:]])(mvn|gradle)([[:space:]]|$)|pom\.xml|build\.gradle' "$f"
+}
+
 python_related=false
 node_related=false
+java_related=false
 if is_python_related "$in"; then python_related=true; fi
 if is_node_related "$in"; then node_related=true; fi
+if is_java_related "$in"; then java_related=true; fi
 
 awk -v py="$python_related" -v nd="$node_related" '
 BEGIN {
@@ -74,7 +81,7 @@ function stage_flush(    i) {
 END { stage_flush() }
 ' "$in" > "$out"
 
-if grep -Eqi 'maven|gradle|openjdk|temurin' "$out" && ! grep -q 'mirror-toolkit: maven-mirror-snippet' "$out"; then
+if [[ "$java_related" == "true" ]] && ! grep -q 'mirror-toolkit: maven-mirror-snippet' "$out"; then
 cat >> "$out" <<'EOF_MVN'
 
 # mirror-toolkit: maven-mirror-snippet
@@ -85,7 +92,7 @@ cat >> "$out" <<'EOF_MVN'
 EOF_MVN
 fi
 
-if grep -q '# mirror-toolkit: enable-maven-mirror' "$out" && ! grep -q 'mirror-toolkit maven active block' "$out"; then
+if [[ "$java_related" == "true" ]] && grep -q '# mirror-toolkit: enable-maven-mirror' "$out" && ! grep -q 'mirror-toolkit maven active block' "$out"; then
 cat >> "$out" <<'EOF_MVNA'
 
 # mirror-toolkit maven active block
