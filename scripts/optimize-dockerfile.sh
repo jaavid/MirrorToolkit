@@ -6,6 +6,7 @@ in="$1"; out="$2"
 [[ -f "$in" ]] || { echo "Input not found: $in" >&2; exit 1; }
 
 if [[ -f .env.mirrors ]]; then
+  # shellcheck disable=SC1091
   set -a; source .env.mirrors; set +a
 fi
 

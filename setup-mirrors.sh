@@ -75,6 +75,7 @@ write_env(){
 
 apply_configs(){
   [[ "$APPLY" == "true" ]] || return 0
+  # shellcheck disable=SC1090
   set -a; source "$OUTPUT"; set +a
 
   mkdir -p "$HOME/.pip" "$HOME/.m2"

@@ -15,3 +15,9 @@ Options:
 - `--no-apply`
 - `--restart-docker`
 - `-h, --help`
+
+
+Lint check:
+```bash
+shellcheck setup-mirrors.sh scripts/*.sh
+```
