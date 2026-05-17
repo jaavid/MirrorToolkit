@@ -65,3 +65,10 @@ Shell optimizer:
 ```bash
 ./scripts/optimize-dockerfile.sh input.Dockerfile output.Dockerfile
 ```
+
+## GitHub Pages UI
+
+- The docs site is a static Tailwind CDN page in `docs-site/` (no build step required).
+- Browser benchmark results are approximate because CORS can affect reachability/latency checks.
+- CLI benchmark output remains authoritative for automation and CI.
+- No backend is used.
