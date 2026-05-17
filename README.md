@@ -72,3 +72,12 @@ Shell optimizer:
 - Browser benchmark results are approximate because CORS can affect reachability/latency checks.
 - CLI benchmark output remains authoritative for automation and CI.
 - No backend is used.
+
+
+### Dockerfile optimizer profiles
+
+```bash
+./scripts/optimize-dockerfile.sh Dockerfile Dockerfile.optimized
+./scripts/optimize-dockerfile.sh --profile production --report dockerfile-report.json Dockerfile Dockerfile.optimized
+./scripts/optimize-dockerfile.sh --profile restricted-network --env-file .env.mirrors Dockerfile Dockerfile.optimized
+```
