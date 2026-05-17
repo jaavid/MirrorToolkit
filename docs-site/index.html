@@ -1,1 +1,23 @@
-<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>mirror-toolkit</title><link rel='stylesheet' href='style.css'></head><body><main><h1>mirror-toolkit</h1><p>Select working mirrors and generate environment values for reproducible builds.</p><h2>Dockerfile optimizer</h2><p>Markers:</p><ul><li><code># mirror-toolkit: enable-apt-rewrite</code> (opt-in apt rewrite block; affects image build only)</li><li><code># mirror-toolkit: enable-maven-mirror</code> (opt-in active Maven settings.xml block)</li></ul><p><strong>Warnings:</strong> APT rewrite only happens with marker; Maven active config only happens with marker; no file is uploaded to any server, processing stays in your browser.</p><input type='file' id='file'><br><textarea id='paste' rows='14' cols='100' placeholder='Paste Dockerfile here'></textarea><br><button id='opt'>Optimize pasted Dockerfile</button> <a id='download' style='display:none'>Download optimized Dockerfile</a><pre id='preview'></pre></main><script src='app.js'></script></body></html>
+<!doctype html>
+<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>MirrorToolkit</title><link rel='stylesheet' href='style.css'></head>
+<body><main>
+<h1>MirrorToolkit</h1>
+<p>Small CLI + static helper page for selecting working mirrors and improving Docker builds.</p>
+<p class='note'>Browser benchmark is approximate because CORS may block direct registry checks. The CLI benchmark is authoritative.</p>
+<div class='actions'>
+<button id='runBenchmark'>Run benchmark</button>
+<button id='copyEnv'>Copy generated env</button>
+<button id='downloadReport'>Download mirror-report.json</button>
+<label class='btn'>Upload mirrors.json <input id='mirrorsFile' type='file' accept='.json,application/json'></label>
+</div>
+<div id='summary' class='summary'></div>
+<div id='mirrorsContainer'></div>
+<h2>Dockerfile optimizer</h2>
+<div class='actions'>
+<label class='btn'>Upload Dockerfile <input id='dockerfileUpload' type='file'></label>
+<button id='optimizeDockerfile'>Optimize Dockerfile</button>
+<a id='downloadOptimized' class='btn' style='display:none'>Download optimized Dockerfile</a>
+</div>
+<textarea id='dockerfileInput' rows='12' placeholder='Paste Dockerfile'></textarea>
+<pre id='dockerfileOutput'></pre>
+</main><script src='app.js'></script></body></html>

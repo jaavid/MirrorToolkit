@@ -1,33 +1,57 @@
 {
-  "docker": [
-    {"name":"Docker Official","url":"https://registry-1.docker.io","kind":"registry"},
-    {"name":"mirror.gcr.io","url":"https://mirror.gcr.io","kind":"registry"},
-    {"name":"hub.hamdocker.ir","url":"https://hub.hamdocker.ir","kind":"registry"},
-    {"name":"docker.m.daocloud.io","url":"https://docker.m.daocloud.io","kind":"registry"}
-  ],
-  "python": [
-    {"name":"PyPI","url":"https://pypi.org/simple","kind":"index"},
-    {"name":"mirror.abrha.net","url":"https://mirror.abrha.net/repository/pypi/simple","kind":"index"},
-    {"name":"Tsinghua PyPI","url":"https://pypi.tuna.tsinghua.edu.cn/simple","kind":"index"}
-  ],
-  "node": [
-    {"name":"npm official","url":"https://registry.npmjs.org","kind":"registry"},
-    {"name":"registry.npmmirror.com","url":"https://registry.npmmirror.com","kind":"registry"},
-    {"name":"nx.parsa.citservices.ir","url":"https://nx.parsa.citservices.ir/repository/npm","kind":"registry"}
-  ],
-  "java": [
-    {"name":"Maven Central","url":"https://repo.maven.apache.org/maven2","kind":"maven"},
-    {"name":"maven.aliyun.com","url":"https://maven.aliyun.com/repository/public","kind":"maven"},
-    {"name":"repo.huaweicloud.com","url":"https://repo.huaweicloud.com/repository/maven","kind":"maven"}
-  ],
-  "ubuntu": [
-    {"name":"archive.ubuntu.com","url":"http://archive.ubuntu.com/ubuntu","security_url":"http://security.ubuntu.com/ubuntu","kind":"apt"},
-    {"name":"ir.archive.ubuntu.com","url":"http://ir.archive.ubuntu.com/ubuntu","security_url":"http://security.ubuntu.com/ubuntu","kind":"apt"},
-    {"name":"Tsinghua Ubuntu","url":"https://mirrors.tuna.tsinghua.edu.cn/ubuntu","security_url":"https://mirrors.tuna.tsinghua.edu.cn/ubuntu","kind":"apt"}
-  ],
-  "debian": [
-    {"name":"deb.debian.org","url":"http://deb.debian.org/debian","security_url":"http://security.debian.org/debian-security","kind":"apt"},
-    {"name":"Tsinghua Debian","url":"https://mirrors.tuna.tsinghua.edu.cn/debian","security_url":"https://mirrors.tuna.tsinghua.edu.cn/debian-security","kind":"apt"},
-    {"name":"USTC Debian","url":"https://mirrors.ustc.edu.cn/debian","security_url":"https://mirrors.ustc.edu.cn/debian-security","kind":"apt"}
-  ]
+  "version": 2,
+  "mirrors": {
+    "docker": [
+      {"name":"docker official","url":"https://registry-1.docker.io","kind":"registry","region":"global","priority":100},
+      {"name":"mirror.gcr.io","url":"https://mirror.gcr.io","kind":"registry","region":"global","priority":95},
+      {"name":"hub.hamdocker.ir","url":"https://hub.hamdocker.ir","kind":"registry","region":"ir","priority":90},
+      {"name":"docker.m.daocloud.io","url":"https://docker.m.daocloud.io","kind":"registry","region":"cn","priority":90}
+    ],
+    "pypi": [
+      {"name":"pypi official","url":"https://pypi.org/simple","kind":"index","region":"global","priority":100},
+      {"name":"mirror.abrha.net","url":"https://mirror.abrha.net/repository/pypi/simple","kind":"index","priority":90},
+      {"name":"mirror2.chabokan.net","url":"https://mirror2.chabokan.net/pypi/web/simple","kind":"index","priority":90},
+      {"name":"pypi.tuna.tsinghua.edu.cn","url":"https://pypi.tuna.tsinghua.edu.cn/simple","kind":"index","region":"cn","priority":90}
+    ],
+    "npm": [
+      {"name":"npm official","url":"https://www.npmjs.com","kind":"registry","priority":100},
+      {"name":"registry.npmjs.org","url":"https://registry.npmjs.org","kind":"registry","priority":100},
+      {"name":"registry.npmmirror.com","url":"https://registry.npmmirror.com","kind":"registry","priority":90},
+      {"name":"nx.parsa.citservices.ir","url":"https://nx.parsa.citservices.ir/repository/npm","kind":"registry","priority":90},
+      {"name":"mirror2.chabokan.net npm","url":"https://mirror2.chabokan.net/npm","kind":"registry","priority":90}
+    ],
+    "maven": [
+      {"name":"Maven Central","url":"https://repo.maven.apache.org/maven2","kind":"maven","priority":100},
+      {"name":"maven.aliyun.com","url":"https://maven.aliyun.com/repository/public","kind":"maven","priority":90},
+      {"name":"repo.huaweicloud.com","url":"https://repo.huaweicloud.com/repository/maven","kind":"maven","priority":90}
+    ],
+    "ubuntu": [
+      {"name":"archive.ubuntu.com","url":"http://archive.ubuntu.com/ubuntu","kind":"apt","security_url":"http://security.ubuntu.com/ubuntu","priority":100},
+      {"name":"security.ubuntu.com","url":"http://security.ubuntu.com/ubuntu","kind":"apt","security_url":"http://security.ubuntu.com/ubuntu","priority":100},
+      {"name":"ir.archive.ubuntu.com","url":"http://ir.archive.ubuntu.com/ubuntu","kind":"apt","security_url":"http://security.ubuntu.com/ubuntu","priority":90},
+      {"name":"mirrors.tuna.tsinghua.edu.cn ubuntu","url":"https://mirrors.tuna.tsinghua.edu.cn/ubuntu","kind":"apt","security_url":"https://mirrors.tuna.tsinghua.edu.cn/ubuntu","priority":90}
+    ],
+    "debian": [
+      {"name":"deb.debian.org","url":"http://deb.debian.org/debian","kind":"apt","security_url":"http://security.debian.org/debian-security","priority":100},
+      {"name":"security.debian.org","url":"http://security.debian.org/debian-security","kind":"apt","security_url":"http://security.debian.org/debian-security","priority":100},
+      {"name":"mirrors.tuna.tsinghua.edu.cn debian","url":"https://mirrors.tuna.tsinghua.edu.cn/debian","kind":"apt","security_url":"https://mirrors.tuna.tsinghua.edu.cn/debian-security","priority":90},
+      {"name":"mirrors.ustc.edu.cn debian","url":"https://mirrors.ustc.edu.cn/debian","kind":"apt","security_url":"https://mirrors.ustc.edu.cn/debian-security","priority":90}
+    ],
+    "alpine": [
+      {"name":"dl-cdn.alpinelinux.org","url":"https://dl-cdn.alpinelinux.org/alpine","kind":"apk","priority":100},
+      {"name":"mirrors.tuna.tsinghua.edu.cn alpine","url":"https://mirrors.tuna.tsinghua.edu.cn/alpine","kind":"apk","priority":90}
+    ],
+    "golang": [
+      {"name":"proxy.golang.org","url":"https://proxy.golang.org","kind":"proxy","priority":100},
+      {"name":"goproxy.cn","url":"https://goproxy.cn","kind":"proxy","priority":90},
+      {"name":"goproxy.io","url":"https://goproxy.io","kind":"proxy","priority":90}
+    ],
+    "composer": [
+      {"name":"repo.packagist.org","url":"https://repo.packagist.org","kind":"composer","priority":100},
+      {"name":"mirrors.aliyun.com/composer","url":"https://mirrors.aliyun.com/composer","kind":"composer","priority":90}
+    ],
+    "nuget": [
+      {"name":"api.nuget.org","url":"https://api.nuget.org/v3/index.json","kind":"nuget","priority":100}
+    ]
+  }
 }

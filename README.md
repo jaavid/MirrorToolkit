@@ -1,56 +1,67 @@
-# mirror-toolkit
+# MirrorToolkit
 
-A production-ready CLI/toolkit for selecting reachable mirrors in unstable or restricted networks and generating deterministic environment/config outputs for Docker, Python/pip, Node/npm/pnpm/yarn, Java/Maven, Ubuntu APT, and Debian APT.
+MirrorToolkit is a **small CLI + static helper page** for selecting working package mirrors and improving Docker builds in restricted networks. It is **not a platform**.
 
-## Quick start
+## CLI quick usage
+
 ```bash
 chmod +x setup-mirrors.sh
-./setup-mirrors.sh --config mirrors.json --output .env.mirrors --report mirror-report.json --timeout 6 --no-apply
+./setup-mirrors.sh --config mirrors.json --output .env.mirrors --report mirror-report.json --timeout 6
+# also supported:
+./setup-mirrors.sh mirrors.json
 ```
 
-## CLI help
+Outputs:
+- `.env.mirrors`
+- `mirror-report.json`
+
+## GitHub Pages usage
+
+Open `docs-site/index.html` (or published Pages site), then:
+- Run benchmark
+- Copy generated env
+- Download mirror-report.json
+- Upload/paste Dockerfile, optimize, download
+
+> Browser benchmark is approximate because CORS may block direct registry checks. The CLI benchmark is authoritative.
+
+## mirrors.json schema
+
+```json
+{
+  "version": 2,
+  "mirrors": {
+    "docker": [], "pypi": [], "npm": [], "maven": [], "ubuntu": [],
+    "debian": [], "alpine": [], "golang": [], "composer": [], "nuget": []
+  }
+}
+```
+
+Mirror item format:
+
+```json
+{
+  "name": "...",
+  "url": "...",
+  "kind": "...",
+  "security_url": "...",
+  "region": "...",
+  "priority": 100
+}
+```
+
+Required fields: `name`, `url`, `kind`.
+
+## Dockerfile optimizer
+
+- no `ENV` before `FROM`
+- inject mirror `ARG`s after each `FROM`
+- avoid duplicate lines
+- apt rewrite only with marker `# mirror-toolkit: enable-apt-rewrite`
+- maven active block only with marker `# mirror-toolkit: enable-maven-mirror`
+
+Shell optimizer:
+
 ```bash
-./setup-mirrors.sh --help
+./scripts/optimize-dockerfile.sh input.Dockerfile output.Dockerfile
 ```
-
-## `--apply` behavior
-- Docker: only when root; writes `/etc/docker/daemon.json`, preserves existing JSON keys, and backs up to `/etc/docker/daemon.json.bak.TIMESTAMP`.
-- Docker restart is opt-in with `--restart-docker`.
-- pip: writes `~/.pip/pip.conf` (backup if exists).
-- npm: runs `npm config set registry ...` when npm exists; warns otherwise.
-- Maven: writes `~/.m2/settings.xml` (backup if exists).
-- Host APT is never rewritten.
-
-## Generated env keys
-- `DOCKER_REGISTRY_MIRROR`, `DOCKER_REGISTRY_MIRROR_NAME`
-- `PIP_INDEX_URL`, `PIP_INDEX_URL_NAME`, `PIP_EXTRA_INDEX_URL`
-- `NPM_CONFIG_REGISTRY`, `NPM_CONFIG_REGISTRY_NAME`, `YARN_NPM_REGISTRY_SERVER`, `PNPM_REGISTRY`
-- `MAVEN_MIRROR_URL`, `MAVEN_MIRROR_URL_NAME`
-- `APT_UBUNTU_MIRROR`, `APT_UBUNTU_MIRROR_NAME`, `APT_UBUNTU_SECURITY_MIRROR`
-- `APT_DEBIAN_MIRROR`, `APT_DEBIAN_MIRROR_NAME`, `APT_DEBIAN_SECURITY_MIRROR`
-
-## Dockerfile optimizer examples
-- Python/Node Dockerfiles get only relevant env lines.
-- Maven snippet appears only for Java-related Dockerfiles.
-- Active Maven block requires marker: `# mirror-toolkit: enable-maven-mirror`.
-- APT rewrite block requires marker: `# mirror-toolkit: enable-apt-rewrite`.
-
-## Docker build usage
-```bash
-source .env.mirrors
-docker build \
-  --build-arg PIP_INDEX_URL="$PIP_INDEX_URL" \
-  --build-arg NPM_CONFIG_REGISTRY="$NPM_CONFIG_REGISTRY" \
-  --build-arg MAVEN_MIRROR_URL="$MAVEN_MIRROR_URL" \
-  -f examples/Dockerfile.python-node .
-```
-
-
-## Linting
-```bash
-shellcheck setup-mirrors.sh scripts/*.sh
-```
-
-Notes:
-- `setup-mirrors.sh` intentionally sources the path provided by `--output` at runtime when `--apply` is enabled.
-- `scripts/optimize-dockerfile.sh` optionally sources `.env.mirrors` when present.

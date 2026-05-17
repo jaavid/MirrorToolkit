@@ -8,5 +8,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y shellcheck jq
       - run: bash -n setup-mirrors.sh scripts/*.sh
       - run: ./scripts/validate-json.sh
+      - run: ./setup-mirrors.sh --config mirrors.json --output /tmp/.env.mirrors --report /tmp/mirror-report.json --timeout 3
       - run: ./scripts/smoke-test.sh
       - run: shellcheck setup-mirrors.sh scripts/*.sh
+      - run: rg -n -i "backend|database|account|dashboard|telemetry|platform" README.md docs-site .github/workflows || true
