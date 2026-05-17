@@ -1,0 +1,5 @@
+.env.mirrors
+mirror-report.json
+*.log
+.DS_Store
+node_modules/

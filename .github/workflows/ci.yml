@@ -1,0 +1,17 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/validate-json.sh
+      - name: shellcheck (if available)
+        run: |
+          if command -v shellcheck >/dev/null; then
+            shellcheck setup-mirrors.sh scripts/*.sh
+          else
+            echo "shellcheck unavailable, skipping"
+          fi
+      - run: ./setup-mirrors.sh --config mirrors.json --output /tmp/.env.mirrors --report /tmp/mirror-report.json --timeout 3
+      - run: test -f /tmp/.env.mirrors && test -f /tmp/mirror-report.json
