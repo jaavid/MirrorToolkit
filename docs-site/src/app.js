@@ -44,8 +44,16 @@ function statusBadge(statusValue) {
     [STATUS_MODEL.FAILED]: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
     [STATUS_MODEL.UNTESTED]: 'border-slate-500/40 bg-slate-500/10 text-slate-300'
   };
-  const label = String(statusValue || STATUS_MODEL.UNTESTED).replace(/-/g, ' ');
-  return `<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone[statusValue] || tone[STATUS_MODEL.UNTESTED]}">${label}</span>`;
+  const labelsFa = {
+    [STATUS_MODEL.OK]: 'سالم',
+    [STATUS_MODEL.SLOW]: 'کند',
+    [STATUS_MODEL.BLOCKED_BY_BROWSER]: 'محدودیت مرورگر',
+    [STATUS_MODEL.FAILED]: 'ناموفق',
+    [STATUS_MODEL.UNTESTED]: 'بررسی‌نشده'
+  };
+  const rawLabel = String(statusValue || STATUS_MODEL.UNTESTED);
+  const label = labelsFa[rawLabel] || labelsFa[STATUS_MODEL.UNTESTED];
+  return `<span title="${rawLabel}" aria-label="${rawLabel}" class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone[statusValue] || tone[STATUS_MODEL.UNTESTED]}">${label}</span>`;
 }
 
 function getRegionBadge(raw = {}) {
@@ -54,9 +62,9 @@ function getRegionBadge(raw = {}) {
   const alpha2 = region.length === 2 ? region.toLowerCase() : '';
   const allowedFlags = new Set(['ir', 'jp', 'fr', 'cn', 'nl', 'us', 'ru', 'de', 'gb']);
   if (alpha2 && allowedFlags.has(alpha2)) {
-    return `<span class="inline-flex items-center gap-1 rounded-full border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300"><span class="fi fi-${alpha2}"></span>${alpha2.toUpperCase()}</span>`;
+    return `<span class="technical inline-flex items-center gap-1 rounded-full border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300"><span class="fi fi-${alpha2}"></span>${alpha2.toUpperCase()}</span>`;
   }
-  return `<span class="inline-flex items-center rounded-full border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300">${region}</span>`;
+  return `<span class="technical inline-flex items-center rounded-full border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300">${region}</span>`;
 }
 
 function normalizeMirrorData(rawData) { /* unchanged logic */
@@ -110,7 +118,7 @@ function renderSummary() { const rows = state.results; const okOrSlow = rows.fil
 
 function renderFilters() { byId('filters').innerHTML = ['all', ...state.ecosystems].map((category) => { const icon = getEcosystemIcon(category); return `<button data-cat="${category}" class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${state.activeCategory === category ? 'border-primary bg-primary/20' : 'border-slate-700'}">${icon ? `<img src="${icon}" alt="" class="h-4 w-4">` : ''}<span>${category}</span></button>`; }).join(''); byId('filters').querySelectorAll('button').forEach((btn) => { btn.onclick = () => { state.activeCategory = btn.dataset.cat; renderRows(); }; }); }
 
-function renderRows() { const filtered = state.results.filter((r) => state.activeCategory === 'all' || r.ecosystem === state.activeCategory); byId('latencyRows').innerHTML = filtered.map((r) => { const icon = getEcosystemIcon(r.ecosystem); const region = getRegionBadge(r.raw); return `<article class="rounded-lg border border-slate-800 bg-surface/70 p-2.5"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="flex items-center gap-2 font-semibold text-sm">${icon ? `<img src="${icon}" alt="" class="h-4 w-4">` : ''}<span class="truncate">${r.name}</span></p><p class="mt-0.5 text-[11px] text-slate-400">${r.ecosystem}</p><p class="mt-1 truncate text-xs text-slate-300">${r.url}</p></div><div class="shrink-0 text-right">${statusBadge(r.status)}${Number.isFinite(r.latency) ? `<p class="mt-1 text-[11px] text-slate-400">${r.latency}ms</p>` : ''}${region ? `<div class="mt-1">${region}</div>` : ''}</div></div></article>`; }).join(''); }
+function renderRows() { const filtered = state.results.filter((r) => state.activeCategory === 'all' || r.ecosystem === state.activeCategory); byId('latencyRows').innerHTML = filtered.map((r) => { const icon = getEcosystemIcon(r.ecosystem); const region = getRegionBadge(r.raw); return `<article class="rounded-lg border border-slate-800 bg-surface/70 p-2.5"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="flex items-center gap-2 font-semibold text-sm">${icon ? `<img src="${icon}" alt="" class="h-4 w-4">` : ''}<span class="truncate">${r.name}</span></p><p class="technical mt-0.5 text-[11px] text-slate-400">${r.ecosystem}</p><p class="technical mt-1 truncate text-xs text-slate-300">${r.url}</p></div><div class="shrink-0 text-right">${statusBadge(r.status)}${Number.isFinite(r.latency) ? `<p class="mt-1 text-[11px] text-slate-400">${r.latency}ms</p>` : ''}${region ? `<div class="mt-1">${region}</div>` : ''}</div></div></article>`; }).join(''); }
 
 function optimizeDockerfile(input) { const lines = input.split(/\r?\n/); const out = []; const inserted = []; let baseImage = null; for (const line of lines) { if (!baseImage && /^\s*FROM\s+(.+)/i.test(line)) baseImage = line.match(/^\s*FROM\s+(.+)/i)[1].trim(); out.push(line);} if (baseImage) { const argLines = ['ARG NPM_CONFIG_REGISTRY', 'ARG PIP_INDEX_URL', 'ARG APT_UBUNTU_MIRROR', 'ARG APT_DEBIAN_MIRROR']; const firstFrom = out.findIndex((l) => /^\s*FROM\s+/i.test(l)); argLines.forEach((arg) => { if (!out.some((l) => l.trim() === arg)) { out.splice(firstFrom + 1, 0, arg); inserted.push(arg); } }); } return { text: out.join('\n'), summary: { baseImage: baseImage || 'not detected', insertedArgs: inserted, warnings: baseImage ? [] : ['No FROM line detected; no ARG lines inserted.'] } }; }
 
