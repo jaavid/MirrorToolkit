@@ -23,6 +23,10 @@ try {
   await access(path.join(root, '..', 'mirrors.json'));
   await cp(path.join(root, '..', 'mirrors.json'), path.join(dist, 'mirrors.json'));
 } catch {}
+try {
+  await access(path.join(root, '..', 'docs', 'CNAME'));
+  await cp(path.join(root, '..', 'docs', 'CNAME'), path.join(dist, 'CNAME'));
+} catch {}
 
 const htmlPath = path.join(dist, 'index.html');
 const html = await readFile(htmlPath, 'utf8');

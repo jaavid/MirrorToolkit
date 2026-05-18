@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck jq ripgrep
       - run: bash -n setup-mirrors.sh scripts/*.sh
       - run: ./scripts/validate-json.sh
       - run: ./setup-mirrors.sh --config mirrors.json --output /tmp/.env.mirrors --report /tmp/mirror-report.json --timeout 3
