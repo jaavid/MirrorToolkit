@@ -4,8 +4,7 @@
 
 @font-face {
   font-family: "Handjet";
-  src: url("./fonts/handjet/Handjet[wght].woff2")
-    url("./fonts/handjet/Handjet-VariableFont.ttf");
+  src: url("./fonts/handjet/Handjet-VariableFont.ttf");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
