@@ -27,55 +27,47 @@ function normalizeMirrorData(rawData) {
   const ecosystemSet = new Set();
   const source = rawData && typeof rawData === 'object' ? rawData : {};
 
-  if (Array.isArray(source.mirrors)) {
-    source.mirrors.forEach((mirror) => {
-      if (!mirror || typeof mirror !== 'object') return;
-      const ecosystem = String(mirror.ecosystem || '').trim();
-      const url = String(mirror.url || '').trim();
-      if (!ecosystem || !url) return;
-      const name = String(mirror.name || mirror.provider || url).trim();
-      ecosystemSet.add(ecosystem);
-      mirrors.push({
-        id: stableMirrorId(ecosystem, name, url),
-        name,
-        ecosystem,
-        url,
-        homepage: mirror.homepage,
-        country: mirror.country,
-        provider: mirror.provider,
-        tags: Array.isArray(mirror.tags) ? mirror.tags : undefined,
-        raw: mirror
-      });
+  const pushMirror = (mirror, ecosystemFromKey = '') => {
+    if (!mirror || typeof mirror !== 'object') return;
+    const ecosystem = String(ecosystemFromKey || mirror.ecosystem || '').trim();
+    const url = String(mirror.url || '').trim();
+    if (!ecosystem || !url) return;
+    const name = String(mirror.name || mirror.provider || url).trim();
+    ecosystemSet.add(ecosystem);
+    mirrors.push({
+      id: stableMirrorId(ecosystem, name, url),
+      name,
+      ecosystem,
+      url,
+      homepage: mirror.homepage,
+      country: mirror.country || mirror.region,
+      provider: mirror.provider,
+      tags: Array.isArray(mirror.tags) ? mirror.tags : undefined,
+      raw: mirror
     });
+  };
+
+  const groupedMirrors = source.mirrors;
+  if (groupedMirrors && typeof groupedMirrors === 'object' && !Array.isArray(groupedMirrors)) {
+    Object.entries(groupedMirrors).forEach(([ecosystemKey, ecosystemMirrors]) => {
+      if (!Array.isArray(ecosystemMirrors)) return;
+      ecosystemMirrors.forEach((mirror) => pushMirror(mirror, ecosystemKey));
+    });
+  }
+
+  if (Array.isArray(source.mirrors)) {
+    source.mirrors.forEach((mirror) => pushMirror(mirror));
   }
 
   const legacyEcosystems = source.ecosystems;
   if (legacyEcosystems && typeof legacyEcosystems === 'object' && !Array.isArray(legacyEcosystems)) {
     Object.entries(legacyEcosystems).forEach(([ecosystemKey, ecosystemValue]) => {
-      const ecosystem = String(ecosystemKey || '').trim();
       const mirrorRows = Array.isArray(ecosystemValue)
         ? ecosystemValue
         : Array.isArray(ecosystemValue?.mirrors)
           ? ecosystemValue.mirrors
           : [];
-      mirrorRows.forEach((mirror) => {
-        if (!mirror || typeof mirror !== 'object') return;
-        const url = String(mirror.url || '').trim();
-        if (!ecosystem || !url) return;
-        const name = String(mirror.name || mirror.provider || url).trim();
-        ecosystemSet.add(ecosystem);
-        mirrors.push({
-          id: stableMirrorId(ecosystem, name, url),
-          name,
-          ecosystem,
-          url,
-          homepage: mirror.homepage,
-          country: mirror.country,
-          provider: mirror.provider,
-          tags: Array.isArray(mirror.tags) ? mirror.tags : undefined,
-          raw: mirror
-        });
-      });
+      mirrorRows.forEach((mirror) => pushMirror(mirror, ecosystemKey));
     });
   }
 
@@ -83,7 +75,7 @@ function normalizeMirrorData(rawData) {
   const ecosystems = Array.from(ecosystemSet).sort((a, b) => a.localeCompare(b));
 
   return {
-    version: typeof source.version === 'string' ? source.version : null,
+    version: source.version ?? null,
     mirrors: uniqueMirrors,
     ecosystems,
     stats: {
