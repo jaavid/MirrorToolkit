@@ -25,6 +25,7 @@
         <label class="rounded-lg bg-slate-700 px-3 py-2 text-sm cursor-pointer">Upload Dockerfile<input id="dockerUpload" type="file" class="hidden" aria-label="Upload Dockerfile"></label>
       </div>
       <p id="statusMessage" role="status" class="mt-2 text-sm text-slate-300"></p>
+      <ol id="stepStrip" class="mt-3 flex flex-wrap gap-2"></ol>
     </section>
 
     <input id="mirrorsUpload" type="file" class="hidden" accept="application/json">
@@ -42,7 +43,8 @@
     <section class="rounded-xl border border-slate-800 bg-surface/70 p-3 space-y-2">
       <h2 class="font-semibold">Dockerfile optimizer</h2>
       <textarea id="dockerInput" class="h-48 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs" placeholder="Paste Dockerfile"></textarea>
-      <div><button id="optimizeDocker" class="rounded-lg bg-success px-3 py-2 text-sm font-semibold text-slate-900">Optimize</button> <button id="downloadDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">Download optimized Dockerfile</button></div>
+      <div><button id="optimizeDocker" class="rounded-lg bg-success px-3 py-2 text-sm font-semibold text-slate-900">Optimize</button> <button id="copyDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">Copy optimized Dockerfile</button> <button id="downloadDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">Download optimized Dockerfile</button></div>
+      <div id="dockerSummary" class="text-xs text-slate-300 space-y-1"></div>
       <pre id="dockerOutput" class="max-h-80 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-xs"></pre>
     </section>
   </main>
