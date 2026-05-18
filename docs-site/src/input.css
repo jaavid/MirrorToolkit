@@ -4,7 +4,9 @@
 
 @font-face {
   font-family: "Handjet";
-  src: url("./assets/fonts/handjet/Handjet-VariableFont.ttf") format("truetype");
+  src:
+    url("./assets/fonts/handjet/Handjet[wght].woff2") format("woff2"),
+    url("./assets/fonts/handjet/Handjet-VariableFont.ttf") format("truetype");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -12,9 +14,19 @@
 
 @layer base {
   :root { color-scheme: dark; }
-  body { @apply bg-slate-950 text-slate-100 antialiased font-sans; }
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased;
+    font-family: Vazirmatn, IRANSansX, "Noto Sans Arabic", Tahoma, "Segoe UI", system-ui, sans-serif;
+  }
 }
 
 @layer components {
   .font-brand { font-family: "Handjet", ui-sans-serif, system-ui, sans-serif; }
+  .ltr { direction: ltr; text-align: left; }
+  .rtl { direction: rtl; text-align: right; }
+  .technical {
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: plaintext;
+  }
 }

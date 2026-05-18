@@ -6,7 +6,9 @@
     "clean": "node build.mjs --clean",
     "build:css": "tailwindcss -i ./src/input.css -o ./dist/assets/tailwind.css --minify",
     "build": "node build.mjs",
-    "watch": "tailwindcss -i ./src/input.css -o ./dist/assets/tailwind.css --watch"
+    "watch": "tailwindcss -i ./src/input.css -o ./dist/assets/tailwind.css --watch",
+    "check:ui-contract": "node scripts/check-ui-contract.mjs",
+    "test": "npm run build && npm run check:ui-contract"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
