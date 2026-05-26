@@ -16,7 +16,8 @@ const state = {
   loadState: 'loading',
   benchmarkDone: false,
   dockerOptimized: false,
-  dockerSummary: null
+  dockerSummary: null,
+  optimizeTarget: 'Dockerfile'
 };
 const byId = (id) => document.getElementById(id);
 const status = (msg) => { byId('statusMessage').textContent = msg; };
@@ -108,7 +109,7 @@ function setLoadState(nextState, details = {}) {
   updateStepStrip();
 }
 
-function updateStepStrip() { const steps = ['Load mirrors', 'Run browser check', 'Copy env', 'Paste Dockerfile', 'Download output']; let active = 0; if (state.loadState === 'loaded' || state.loadState === 'empty') active = 1; if (state.benchmarkDone) active = 2; if (state.dockerOptimized) active = 4; byId('stepStrip').innerHTML = steps.map((step, idx) => `<li class="rounded-full border px-3 py-1 text-xs ${idx <= active ? 'border-primary/70 bg-primary/15 text-slate-100' : 'border-slate-700 text-slate-400'}">${idx + 1}. ${step}</li>`).join(''); }
+function updateStepStrip() { const steps = ['Load mirrors', 'Run browser check', 'Copy env', 'Paste config file', 'Download output']; let active = 0; if (state.loadState === 'loaded' || state.loadState === 'empty') active = 1; if (state.benchmarkDone) active = 2; if (state.dockerOptimized) active = 4; byId('stepStrip').innerHTML = steps.map((step, idx) => `<li class="rounded-full border px-3 py-1 text-xs ${idx <= active ? 'border-primary/70 bg-primary/15 text-slate-100' : 'border-slate-700 text-slate-400'}">${idx + 1}. ${step}</li>`).join(''); }
 function rankStatus(value) { if (value === STATUS_MODEL.OK) return 0; if (value === STATUS_MODEL.SLOW) return 1; if (value === STATUS_MODEL.UNTESTED) return 2; if (value === STATUS_MODEL.BLOCKED_BY_BROWSER) return 3; return 4; }
 function pickBestMirror(results, ecosystems) { const candidates = results.filter((r) => ecosystems.includes(r.ecosystem.toLowerCase()) && r.status !== STATUS_MODEL.FAILED); if (!candidates.length) return null; return candidates.sort((a, b) => { const s = rankStatus(a.status) - rankStatus(b.status); if (s !== 0) return s; return (a.latency ?? Infinity) - (b.latency ?? Infinity); })[0]; }
 function mirrorComments(mirror) { const lines = [`# status: ${mirror.status}`]; if (Number.isFinite(mirror.latency)) lines.push(`# latency: ${mirror.latency}ms`); if (mirror.status === STATUS_MODEL.UNTESTED) lines.push('# note: run browser check or CLI benchmark before production use'); if (mirror.status === STATUS_MODEL.BLOCKED_BY_BROWSER) lines.push('# note: browser could not verify this mirror because of CORS'); return lines; }
@@ -119,6 +120,50 @@ function renderSummary() { const rows = state.results; const okOrSlow = rows.fil
 function renderFilters() { byId('filters').innerHTML = ['all', ...state.ecosystems].map((category) => { const icon = getEcosystemIcon(category); return `<button data-cat="${category}" class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${state.activeCategory === category ? 'border-primary bg-primary/20' : 'border-slate-700'}">${icon ? `<img src="${icon}" alt="" class="h-4 w-4">` : ''}<span>${category}</span></button>`; }).join(''); byId('filters').querySelectorAll('button').forEach((btn) => { btn.onclick = () => { state.activeCategory = btn.dataset.cat; renderRows(); }; }); }
 
 function renderRows() { const filtered = state.results.filter((r) => state.activeCategory === 'all' || r.ecosystem === state.activeCategory); byId('latencyRows').innerHTML = filtered.map((r) => { const icon = getEcosystemIcon(r.ecosystem); const region = getRegionBadge(r.raw); return `<article class="rounded-lg border border-slate-800 bg-surface/70 p-2.5"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="flex items-center gap-2 font-semibold text-sm">${icon ? `<img src="${icon}" alt="" class="h-4 w-4">` : ''}<span class="truncate">${r.name}</span></p><p class="technical mt-0.5 text-[11px] text-slate-400">${r.ecosystem}</p><p class="technical mt-1 truncate text-xs text-slate-300">${r.url}</p></div><div class="shrink-0 text-right">${statusBadge(r.status)}${Number.isFinite(r.latency) ? `<p class="mt-1 text-[11px] text-slate-400">${r.latency}ms</p>` : ''}${region ? `<div class="mt-1">${region}</div>` : ''}</div></div></article>`; }).join(''); }
+
+function detectOptimizeTarget(input) {
+  const text = String(input || '');
+  if (/^\s*pipeline\s*\{/mi.test(text) || /^\s*node\s*\{/mi.test(text) || /\bstages\s*\{/mi.test(text)) return 'Jenkinsfile';
+  if (/^\s*FROM\s+/mi.test(text)) return 'Dockerfile';
+  return 'Dockerfile';
+}
+
+function optimizeJenkinsfile(input) {
+  const lines = String(input || '').split(/\r?\n/);
+  const out = [];
+  const inserted = [];
+  const warnings = [];
+  let inShBlock = false;
+  let quoteType = '';
+
+  for (const line of lines) {
+    out.push(line);
+    const trimmed = line.trim();
+
+    if (!inShBlock && /\bsh\s+'''\s*$/.test(trimmed)) { inShBlock = true; quoteType = "'''"; continue; }
+    if (!inShBlock && /\bsh\s+"""\s*$/.test(trimmed)) { inShBlock = true; quoteType = '"""'; continue; }
+    if (inShBlock && trimmed === quoteType) { inShBlock = false; quoteType = ''; continue; }
+
+    if (inShBlock && /\bnpm\s+(ci|install)\b/.test(trimmed)) {
+      const indent = line.match(/^\s*/)[0];
+      const exportLine = `${indent}export NPM_CONFIG_REGISTRY="$NPM_CONFIG_REGISTRY"`;
+      if (!out.includes(exportLine)) {
+        out.splice(out.length - 1, 0, exportLine);
+        inserted.push('NPM_CONFIG_REGISTRY export');
+      }
+    }
+    if (inShBlock && /\b(pip|pip3)\s+install\b/.test(trimmed)) {
+      const indent = line.match(/^\s*/)[0];
+      const exportLine = `${indent}export PIP_INDEX_URL="$PIP_INDEX_URL"`;
+      if (!out.includes(exportLine)) {
+        out.splice(out.length - 1, 0, exportLine);
+        inserted.push('PIP_INDEX_URL export');
+      }
+    }
+  }
+  if (!inserted.length) warnings.push('No npm/pip shell steps detected; no mirror env exports inserted.');
+  return { text: out.join('\n'), summary: { baseImage: 'n/a', insertedArgs: inserted, warnings } };
+}
 
 function optimizeDockerfile(input) { const lines = input.split(/\r?\n/); const out = []; const inserted = []; let baseImage = null; for (const line of lines) { if (!baseImage && /^\s*FROM\s+(.+)/i.test(line)) baseImage = line.match(/^\s*FROM\s+(.+)/i)[1].trim(); out.push(line);} if (baseImage) { const argLines = ['ARG NPM_CONFIG_REGISTRY', 'ARG PIP_INDEX_URL', 'ARG APT_UBUNTU_MIRROR', 'ARG APT_DEBIAN_MIRROR']; const firstFrom = out.findIndex((l) => /^\s*FROM\s+/i.test(l)); argLines.forEach((arg) => { if (!out.some((l) => l.trim() === arg)) { out.splice(firstFrom + 1, 0, arg); inserted.push(arg); } }); } return { text: out.join('\n'), summary: { baseImage: baseImage || 'not detected', insertedArgs: inserted, warnings: baseImage ? [] : ['No FROM line detected; no ARG lines inserted.'] } }; }
 
@@ -134,9 +179,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   byId('mirrorsUpload').onchange = async (e) => { try { const text = await e.target.files[0].text(); useMirrors(JSON.parse(text)); status('Uploaded mirrors.json loaded.'); } catch { setLoadState('error', { path: 'uploaded file' }); byId('uploadFallback').classList.remove('border-warning/60', 'bg-warning/10'); byId('uploadFallback').classList.add('border-rose-500/50', 'bg-rose-500/10'); byId('uploadFallback').innerHTML = '<h2 class="text-base font-semibold">Invalid uploaded JSON</h2><p class="mt-1 text-sm text-slate-300">Please upload a valid mirrors.json payload.</p>'; status('Invalid JSON file'); } };
   byId('copyEnvBtn').onclick = async () => navigator.clipboard.writeText(byId('envOutput').value || '');
   byId('downloadReportBtn').onclick = () => download('mirror-report.json', JSON.stringify(state.results, null, 2));
-  byId('optimizeDocker').onclick = () => { const { text, summary } = optimizeDockerfile(byId('dockerInput').value || ''); state.dockerOptimized = true; state.dockerSummary = summary; byId('dockerOutput').textContent = text; byId('dockerSummary').innerHTML = `<p>base image detected: <span class="text-slate-200">${summary.baseImage}</span></p><p>inserted ARG lines: <span class="text-slate-200">${summary.insertedArgs.length ? summary.insertedArgs.join(', ') : 'none'}</span></p><p>warnings: <span class="text-slate-200">${summary.warnings.length ? summary.warnings.join('; ') : 'none'}</span></p>`; updateStepStrip(); };
+  byId('optimizeDocker').onclick = () => { const input = byId('dockerInput').value || ''; const target = detectOptimizeTarget(input); state.optimizeTarget = target; const { text, summary } = target === 'Jenkinsfile' ? optimizeJenkinsfile(input) : optimizeDockerfile(input); state.dockerOptimized = true; state.dockerSummary = summary; byId('dockerOutput').textContent = text; byId('dockerSummary').innerHTML = `<p>target: <span class="text-slate-200">${target}</span></p><p>base image detected: <span class="text-slate-200">${summary.baseImage}</span></p><p>inserted lines: <span class="text-slate-200">${summary.insertedArgs.length ? summary.insertedArgs.join(', ') : 'none'}</span></p><p>warnings: <span class="text-slate-200">${summary.warnings.length ? summary.warnings.join('; ') : 'none'}</span></p>`; updateStepStrip(); };
   byId('copyDocker').onclick = async () => navigator.clipboard.writeText(byId('dockerOutput').textContent || '');
-  byId('downloadDocker').onclick = () => download('Dockerfile.optimized', byId('dockerOutput').textContent || '');
+  byId('downloadDocker').onclick = () => download(state.optimizeTarget === 'Jenkinsfile' ? 'Jenkinsfile.optimized' : 'Dockerfile.optimized', byId('dockerOutput').textContent || '');
   byId('dockerUpload').onchange = async (e) => { byId('dockerInput').value = await e.target.files[0].text(); };
   updateStepStrip();
   await loadMirrors();

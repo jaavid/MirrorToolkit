@@ -1,0 +1,30 @@
+stages:
+  - validate
+  - docs
+
+variables:
+  NODE_VERSION: "20"
+
+validate:cli:
+  stage: validate
+  image: ubuntu:24.04
+  before_script:
+    - apt-get update
+    - apt-get install -y bash shellcheck jq ripgrep curl ca-certificates
+  script:
+    - bash -n setup-mirrors.sh scripts/*.sh
+    - bash scripts/validate-json.sh
+    - bash setup-mirrors.sh --config mirrors.json --output /tmp/.env.mirrors --report /tmp/mirror-report.json --timeout 3
+    - bash scripts/smoke-test.sh
+    - shellcheck setup-mirrors.sh scripts/*.sh
+
+validate:docs-site:
+  stage: docs
+  image: node:${NODE_VERSION}-bookworm
+  script:
+    - cd docs-site
+    - npm ci
+    - npm run build
+    - test -d dist
+    - test -f dist/assets/tailwind.css
+    - '! rg -n -i "cdn\\.tailwindcss|fonts\\.googleapis|unpkg|jsdelivr" dist'
