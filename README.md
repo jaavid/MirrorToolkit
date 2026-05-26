@@ -21,7 +21,7 @@ Build and publish from `docs-site/dist`, then open the published Pages site (or 
 - Run benchmark
 - Copy generated env
 - Download mirror-report.json
-- Upload/paste Dockerfile, optimize, download
+- Upload/paste Dockerfile or Jenkinsfile, optimize, download
 
 > Browser benchmark is approximate because CORS may block direct registry checks. The CLI benchmark is authoritative.
 
@@ -68,6 +68,22 @@ Notes:
 - Build output is deterministic static files in `docs-site/dist`.
 - GitHub Pages workflow deploys `docs-site/dist` only.
 - Frontend remains fully static and offline-friendly after first load.
+
+## CI support (GitHub, Jenkins, GitLab)
+
+MirrorToolkit now includes first-class CI templates for common platforms:
+
+- GitHub Actions: `.github/workflows/ci.yml`
+- Jenkins: `Jenkinsfile`
+- GitLab CI: `.gitlab-ci.yml`
+
+All three run the same core quality gates:
+
+- shell syntax checks
+- mirror config validation
+- smoke tests
+- ShellCheck linting
+- docs-site deterministic build checks
 
 ## Dockerfile optimizer
 

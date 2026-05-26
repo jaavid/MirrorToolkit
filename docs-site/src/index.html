@@ -11,10 +11,10 @@
   <main class="mx-auto max-w-7xl p-4 md:p-5 space-y-3">
     <header class="rounded-xl border border-slate-800 bg-surface/70 p-3 md:p-4">
       <h1 class="font-brand text-3xl md:text-5xl leading-none tracking-wide">MirrorToolkit</h1>
-      <p class="mt-2 text-slate-300">بررسی سریع میرورها، تولید تنظیمات محیطی، و ساخت Dockerfile سازگار با میرورهای سریع‌تر.</p>
-      <p class="mt-1 text-xs text-slate-400 ltr technical">Check mirrors → review results → paste Dockerfile → copy optimized output</p>
+      <p class="mt-2 text-slate-300">بررسی سریع میرورها، تولید تنظیمات محیطی، و بهینه‌سازی Dockerfile یا Jenkinsfile برای شبکه‌های محدود.</p>
+      <p class="mt-1 text-xs text-slate-400 ltr technical">Check mirrors → review results → paste Dockerfile/Jenkinsfile → copy optimized output</p>
       <div class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-        <span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">CLI-first</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">Static GitHub Pages</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">Dockerfile Optimizer</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">Offline-friendly</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">No backend</span>
+        <span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">CLI-first</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">Static GitHub Pages</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">Dockerfile/Jenkinsfile Optimizer</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">Offline-friendly</span><span class="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1">No backend</span>
       </div>
     </header>
 
@@ -24,7 +24,7 @@
         <button id="uploadMirrorsBtn" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">بارگذاری mirrors.json</button>
         <button id="copyEnvBtn" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">کپی تنظیمات env</button>
         <button id="downloadReportBtn" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">دانلود گزارش</button>
-        <label class="rounded-lg bg-slate-700 px-3 py-2 text-sm cursor-pointer">بارگذاری Dockerfile<input id="dockerUpload" type="file" class="hidden" aria-label="بارگذاری Dockerfile"></label>
+        <label class="rounded-lg bg-slate-700 px-3 py-2 text-sm cursor-pointer">بارگذاری Dockerfile/Jenkinsfile<input id="dockerUpload" type="file" class="hidden" aria-label="بارگذاری Dockerfile/Jenkinsfile"></label>
       </div>
       <p id="statusMessage" role="status" class="mt-2 text-sm text-slate-300"></p>
       <ol id="stepStrip" class="mt-2 flex flex-wrap gap-1.5"></ol>
@@ -43,9 +43,9 @@
       <textarea id="envOutput" dir="ltr" readonly class="technical mt-2 h-44 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs"></textarea>
     </section>
     <section class="rounded-xl border border-slate-800 bg-surface/70 p-3 space-y-2">
-      <h2 class="font-semibold">بهینه‌ساز Dockerfile</h2>
-      <textarea id="dockerInput" dir="ltr" class="technical h-48 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs" placeholder="Paste Dockerfile"></textarea>
-      <div><button id="optimizeDocker" class="rounded-lg bg-success px-3 py-2 text-sm font-semibold text-slate-900">بهینه‌سازی</button> <button id="copyDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">کپی Dockerfile خروجی</button> <button id="downloadDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">دانلود Dockerfile خروجی</button></div>
+      <h2 class="font-semibold">بهینه‌ساز Dockerfile / Jenkinsfile</h2>
+      <textarea id="dockerInput" dir="ltr" class="technical h-48 w-full rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs" placeholder="Paste Dockerfile or Jenkinsfile"></textarea>
+      <div><button id="optimizeDocker" class="rounded-lg bg-success px-3 py-2 text-sm font-semibold text-slate-900">بهینه‌سازی</button> <button id="copyDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">کپی خروجی</button> <button id="downloadDocker" class="rounded-lg bg-slate-700 px-3 py-2 text-sm">دانلود خروجی</button></div>
       <div id="dockerSummary" class="text-xs text-slate-300 space-y-1"></div>
       <pre id="dockerOutput" dir="ltr" class="technical max-h-80 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 text-xs"></pre>
     </section>
